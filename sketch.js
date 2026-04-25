@@ -3,6 +3,8 @@ let robot;
 let sound, fft;
 let loaded = false;
 let bgStars = [];
+let outlineColor = 'green'; // 'green' or 'red'
+let outlineBtn;
 
 function preload() {
   robot = loadModel('robot.obj', true, handleModel, handleError);
@@ -22,6 +24,11 @@ function setup() {
   let playBtn = createButton('Play / Pause');
   playBtn.position(160, 20);
   playBtn.mousePressed(togglePlay);
+
+  // Outline color toggle button
+  outlineBtn = createButton('Outline: Green');
+  outlineBtn.position(270, 20);
+  outlineBtn.mousePressed(toggleOutlineColor);
 
   //background stars/particles
   for (let i = 0; i < 200; i++) {
@@ -64,6 +71,11 @@ function togglePlay() {
   }
 }
 
+function toggleOutlineColor() {
+  outlineColor = (outlineColor === 'green') ? 'red' : 'green';
+  outlineBtn.html('Outline: ' + (outlineColor === 'green' ? 'Green' : 'Red'));
+}
+
 function draw() {
   let bassN   = 0;
   let midN    = 0;
@@ -78,26 +90,43 @@ function draw() {
     level   = (bassN + midN + trebleN) / 3;
   }
 
-  // ---------- REACTIVE BACKGROUND ----------
-  // Base color shifts with bass (red) and treble (blue/cyan)
-  let bgR = map(bassN,   0, 1, 10, 120);
-  let bgG = map(midN,    0, 1, 10,  60);
-  let bgB = map(trebleN, 0, 1, 25, 180);
-  background(bgR, bgG, bgB);
+  let isRed = (outlineColor === 'red');
 
-  // Draw a pulsing "glow" behind everything
+  // ---------- REACTIVE BACKGROUND ----------
+  if (isRed) {
+    // Hot red / crimson theme
+    let bgR = map(bassN,   0, 1, 40, 200);
+    let bgG = map(midN,    0, 1,  5,  30);
+    let bgB = map(trebleN, 0, 1,  5,  40);
+    background(bgR, bgG, bgB);
+  } else {
+    let bgR = map(bassN,   0, 1, 10, 120);
+    let bgG = map(midN,    0, 1, 10,  60);
+    let bgB = map(trebleN, 0, 1, 25, 180);
+    background(bgR, bgG, bgB);
+  }
+
+  //pulsing "glow" behind everything
   push();
   translate(0, 0, -900);
   noStroke();
   let glowSize = map(level, 0, 1, 1200, 2400);
-  // layered soft glows
   for (let i = 6; i > 0; i--) {
-    fill(
-      map(trebleN, 0, 1, 80, 255),
-      map(midN,    0, 1, 40, 180),
-      map(bassN,   0, 1, 120, 255),
-      20 + i * 6
-    );
+    if (isRed) {
+      fill(
+        map(bassN,   0, 1, 180, 255),
+        map(midN,    0, 1,  30, 120),
+        map(trebleN, 0, 1,  20,  90),
+        20 + i * 6
+      );
+    } else {
+      fill(
+        map(trebleN, 0, 1, 80, 255),
+        map(midN,    0, 1, 40, 180),
+        map(bassN,   0, 1, 120, 255),
+        20 + i * 6
+      );
+    }
     ellipse(0, 0, glowSize * (i / 6), glowSize * (i / 6));
   }
   pop();
@@ -110,15 +139,23 @@ function draw() {
     let sz = s.baseSize * tw;
     push();
     translate(s.x, s.y, s.z);
-    fill(
-      200 + trebleN * 55,
-      180 + midN * 75,
-      255,
-      150 + bassN * 105
-    );
+    if (isRed) {
+      fill(
+        255,
+        80 + midN * 100,
+        80 + trebleN * 60,
+        150 + bassN * 105
+      );
+    } else {
+      fill(
+        200 + trebleN * 55,
+        180 + midN * 75,
+        255,
+        150 + bassN * 105
+      );
+    }
     sphere(sz, 6, 6);
     pop();
-    // Gentle drift
     s.x += sin(frameCount * 0.005 + s.hue) * 0.3;
     s.y += cos(frameCount * 0.005 + s.hue) * 0.3;
   }
@@ -127,25 +164,41 @@ function draw() {
   orbitControl();
 
   // ---------- LIGHTS ----------
-  // Soft ambient so the robot never goes fully black
   ambientLight(map(bassN, 0, 1, 30, 90));
 
-  // Main directional "key" light — color shifts with treble
-  let r = map(trebleN, 0, 1, 120, 255);
-  let b = map(trebleN, 0, 1, 255, 120);
-  directionalLight(r, 140, b, 0, -1, -1);
+  if (isRed) {
+    // Warm key light — red to orange with treble
+    let rR = map(trebleN, 0, 1, 200, 255);
+    let rG = map(trebleN, 0, 1,  40, 140);
+    directionalLight(rR, rG, 40, 0, -1, -1);
+  } else {
+    let r = map(trebleN, 0, 1, 120, 255);
+    let b = map(trebleN, 0, 1, 255, 120);
+    directionalLight(r, 140, b, 0, -1, -1);
+  }
 
-  // Rotating colored point lights give moving specular highlights
+  // Rotating colored point lights
   let t = frameCount * 0.02;
   let orbitR = 400;
-  pointLight(
-    255, 80 + midN * 175, 200,
-    cos(t) * orbitR, sin(t) * orbitR * 0.5, 300
-  );
-  pointLight(
-    80 + trebleN * 175, 200, 255,
-    cos(t + PI) * orbitR, sin(t + PI) * orbitR * 0.5, 300
-  );
+  if (isRed) {
+    pointLight(
+      255, 60 + midN * 120, 40,
+      cos(t) * orbitR, sin(t) * orbitR * 0.5, 300
+    );
+    pointLight(
+      255, 120 + trebleN * 80, 60,
+      cos(t + PI) * orbitR, sin(t + PI) * orbitR * 0.5, 300
+    );
+  } else {
+    pointLight(
+      255, 80 + midN * 175, 200,
+      cos(t) * orbitR, sin(t) * orbitR * 0.5, 300
+    );
+    pointLight(
+      80 + trebleN * 175, 200, 255,
+      cos(t + PI) * orbitR, sin(t + PI) * orbitR * 0.5, 300
+    );
+  }
   pointLight(
     255, 255, 255,
     0, -400, 200
@@ -177,8 +230,12 @@ function draw() {
   // High shininess = tight, sharp reflections
   shininess(map(trebleN, 0, 1, 60, 200));
 
-  // Neon green outline on the robot — edges get brighter/thicker with the beat
-  stroke(0, 255, 120, 220);
+  // Neon outline on the robot — edges get brighter/thicker with the beat
+  if (outlineColor === 'green') {
+    stroke(0, 255, 120, 220);
+  } else {
+    stroke(255, 40, 60, 220);
+  }
   strokeWeight(map(bassN, 0, 1, 1.2, 3.5));
 
   model(robot);
@@ -192,8 +249,12 @@ function draw() {
   noFill();
   strokeWeight(20);
 
-  // Ring 1 — XY plane (front-facing)
-  stroke(255, 80, 220, 180);
+  // Ring 1 —  (front-facing)
+  if (isRed) {
+    stroke(255, 60, 80, 200);
+  } else {
+    stroke(255, 80, 220, 180);
+  }
   beginShape();
   for (let i = 0; i < spectrum.length; i += 30) {
     let a = map(i, 0, spectrum.length, 0, TWO_PI);
@@ -202,14 +263,15 @@ function draw() {
   }
   endShape(CLOSE);
 
-
-
-
-  // Ring 2 — slowly tumbling diagonal ring for extra coverage
+  // Ring 2 —  diagonal ring 
   push();
   rotateY(frameCount * 0.008);
   rotateX(frameCount * 0.005);
-  stroke(255, 220, 120, 180);
+  if (isRed) {
+    stroke(255, 160, 60, 200);
+  } else {
+    stroke(255, 220, 120, 180);
+  }
   beginShape();
   for (let i = 0; i < spectrum.length; i += 30) {
     let a = map(i, 0, spectrum.length, 0, TWO_PI);
